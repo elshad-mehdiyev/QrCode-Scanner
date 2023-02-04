@@ -4,12 +4,12 @@ plugins {
 }
 
 android {
-    namespace 'com.example.flashlight'
+    namespace 'com.example.qrcodescanner'
     compileSdk 33
 
     defaultConfig {
-        applicationId "com.example.flashlight"
-        minSdk 24
+        applicationId "com.example.qrcodescanner"
+        minSdk 21
         targetSdk 33
         versionCode 1
         versionName "1.0"

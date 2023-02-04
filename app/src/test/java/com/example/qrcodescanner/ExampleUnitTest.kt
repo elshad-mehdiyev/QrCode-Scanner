@@ -1,4 +1,4 @@
-package com.example.flashlight
+package com.example.qrcodescanner
 
 import org.junit.Test
 

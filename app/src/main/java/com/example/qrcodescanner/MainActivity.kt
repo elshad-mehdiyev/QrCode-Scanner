@@ -1,4 +1,4 @@
-package com.example.flashlight
+package com.example.qrcodescanner
 
 import android.Manifest
 import android.content.Context
@@ -22,7 +22,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
-import com.example.flashlight.databinding.ActivityMainBinding
+import com.example.qrcodescanner.databinding.ActivityMainBinding
 import com.google.android.gms.vision.Frame
 import com.google.android.gms.vision.barcode.Barcode
 import com.google.android.gms.vision.barcode.BarcodeDetector
@@ -158,10 +158,11 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
                     }
                 }
             }
-
         }, null)
 
         previewBuilder = cameraDevice!!.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW)
+        previewBuilder.set(CaptureRequest.CONTROL_AF_MODE, CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_PICTURE)
+
         previewBuilder.addTarget(surface)
         previewBuilder.addTarget(imageReader.surface)
 
