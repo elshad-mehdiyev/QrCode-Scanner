@@ -47,11 +47,12 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
     private var width = 1080
     private var height = 1920
     private var detector: BarcodeDetector? = null
-    private var flashBoolean = false
+    private var flashBoolean = true
     private lateinit var activityResultLauncher: ActivityResultLauncher<Intent>
     private lateinit var permissionLauncher: ActivityResultLauncher<String>
     private var imageUri: Uri? = null
     private var bitmap: Bitmap? = null
+    lateinit var surfaceHolder: SurfaceHolder
 
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -64,14 +65,42 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
         binding.flash.setOnClickListener {
             if (flashBoolean) {
                 flashBoolean = false
-                toggleFlashMode(false)
+                enableFlash()
             } else {
                 flashBoolean = true
-                toggleFlashMode(true)
+                disableFlash()
             }
         }
         binding.gallery.setOnClickListener {
             getImageFromGallery()
+        }
+    }
+
+    private fun enableFlash() {
+
+        session2.stopRepeating()
+
+        val captureRequest = cameraDevice?.createCaptureRequest(
+            CameraDevice.TEMPLATE_PREVIEW
+        )?.apply { addTarget(surfaceHolder.surface) }
+
+        captureRequest?.set(CaptureRequest.FLASH_MODE, CaptureRequest.FLASH_MODE_TORCH)
+
+        if (captureRequest != null) {
+            session2.setRepeatingRequest(captureRequest.build(), null, null)
+        }
+    }
+
+    private fun disableFlash() {
+
+        session2.stopRepeating()
+
+        val captureRequest = cameraDevice?.createCaptureRequest(
+            CameraDevice.TEMPLATE_PREVIEW
+        )?.apply { addTarget(surfaceHolder.surface) }
+
+        if (captureRequest != null) {
+            session2.setRepeatingRequest(captureRequest.build(), null, null)
         }
     }
 
@@ -80,7 +109,7 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
      */
     private fun setUpSurfaceHolder() {
         val surfaceView = binding.surfaceView
-        val surfaceHolder = surfaceView.holder
+        surfaceHolder = surfaceView.holder
         surfaceHolder.addCallback(this)
     }
 
@@ -161,7 +190,10 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
         }, null)
 
         previewBuilder = cameraDevice!!.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW)
-        previewBuilder.set(CaptureRequest.CONTROL_AF_MODE, CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_PICTURE)
+        previewBuilder.set(
+            CaptureRequest.CONTROL_AF_MODE,
+            CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_PICTURE
+        )
 
         previewBuilder.addTarget(surface)
         previewBuilder.addTarget(imageReader.surface)
@@ -194,29 +226,6 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
             val code = barcodes.valueAt(index)
             binding.scanResult.text =
                 binding.scanResult.text.toString() + code.displayValue
-        }
-    }
-
-    /**
-     * turn On  or  turn  Off  flashLight
-     */
-    private fun toggleFlashMode(enable: Boolean) {
-        try {
-            if (enable) {
-                previewBuilder.set(
-                    CaptureRequest.FLASH_MODE,
-                    CaptureRequest.FLASH_MODE_TORCH
-                )
-
-            } else {
-                previewBuilder.set(
-                    CaptureRequest.FLASH_MODE,
-                    CaptureRequest.FLASH_MODE_OFF
-                )
-            }
-            session2.setRepeatingRequest(previewBuilder.build(), null, null)
-        } catch (e: CameraAccessException) {
-            e.printStackTrace()
         }
     }
 
@@ -255,10 +264,15 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
                 permissionLauncher.launch(Manifest.permission.READ_EXTERNAL_STORAGE)
             }
         } else {
-            val intentGallery =
-                Intent(Intent.ACTION_PICK, MediaStore.Images.Media.EXTERNAL_CONTENT_URI)
-            // intent   request
-            activityResultLauncher.launch(intentGallery)
+            val intent = Intent()
+            intent.type = "image/*"
+            intent.action = Intent.ACTION_GET_CONTENT
+
+            activityResultLauncher.launch(intent)
+//            val intentGallery =
+//                Intent(Intent.ACTION_PICK, MediaStore.Images.Media.EXTERNAL_CONTENT_URI)
+//            // intent   request
+//            activityResultLauncher.launch(intentGallery)
         }
     }
 
@@ -269,6 +283,7 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
         activityResultLauncher =
             registerForActivityResult(ActivityResultContracts.StartActivityForResult()) {
                 if (it.resultCode == RESULT_OK) {
+                    flashBoolean = true
                     val intentFromResult = it.data
                     if (intentFromResult != null) {
                         imageUri = intentFromResult.data
