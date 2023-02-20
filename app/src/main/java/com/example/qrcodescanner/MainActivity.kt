@@ -5,20 +5,20 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.res.Resources
-import android.graphics.Bitmap
-import android.graphics.BitmapFactory
-import android.graphics.ImageDecoder
-import android.graphics.ImageFormat
+import android.graphics.*
 import android.hardware.camera2.*
 import android.media.ImageReader
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.provider.MediaStore
-import android.view.SurfaceHolder
+import android.util.DisplayMetrics
+import android.util.Size
+import android.view.*
 import android.widget.Toast
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.annotation.RequiresApi
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
@@ -30,6 +30,10 @@ import com.google.android.material.snackbar.Snackbar
 import java.io.File
 import java.io.FileOutputStream
 import java.io.IOException
+import java.lang.Math.abs
+import java.lang.Math.min
+import java.util.*
+
 
 /**
  *  Using  technology  Camera2  and  Google  Vision  Api.
@@ -54,14 +58,24 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
     private var bitmap: Bitmap? = null
     lateinit var surfaceHolder: SurfaceHolder
 
+    var DSI_height = 2340
+    var DSI_width = 1080
+    var ASPECT_RATIO_TOLERANCE = 9/16
+    lateinit var surfaceView: SurfaceView
+
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        window.setFlags(WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS)
+        supportActionBar?.hide()
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
+        cameraManager = getSystemService(Context.CAMERA_SERVICE) as CameraManager
+        cameraId = cameraManager.cameraIdList[0]
         setUpDetector()
         setUpSurfaceHolder()
         resultLauncherRegister()
+
         binding.flash.setOnClickListener {
             if (flashBoolean) {
                 flashBoolean = false
@@ -108,9 +122,46 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
      * Set up  SurfaceHolder  check  surface  for  ready
      */
     private fun setUpSurfaceHolder() {
-        val surfaceView = binding.surfaceView
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            val windowMetrics: WindowMetrics = windowManager.currentWindowMetrics
+            height = windowMetrics.bounds.height()
+            width = windowMetrics.bounds.width()
+        } else {
+            val displayMetrics = DisplayMetrics()
+            windowManager.defaultDisplay.getRealMetrics(displayMetrics)
+            height = displayMetrics.heightPixels
+            width = displayMetrics.widthPixels
+        }
+
+        surfaceView = binding.surfaceView
+        val layoutParams = surfaceView.layoutParams
+        layoutParams.height = height
+        layoutParams.width = height * getPreviewSize().height / getPreviewSize().width
+        surfaceView.layoutParams = layoutParams
         surfaceHolder = surfaceView.holder
         surfaceHolder.addCallback(this)
+
+    }
+
+
+    // Method to configure the transform
+
+    private fun getPreviewSize(): Size {
+        val characteristics = cameraManager.getCameraCharacteristics(cameraId)
+        val streamConfigurationMap = characteristics.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP)
+        val sizes = streamConfigurationMap?.getOutputSizes(ImageFormat.YUV_420_888)
+        var bestSizes = Size(4000, 3000)
+        var minSize = streamConfigurationMap?.getOutputSizes(ImageFormat.YUV_420_888)?.first()
+        if (sizes != null) {
+            for (i in sizes.indices) {
+                val nextRatio = (sizes[i].height.toFloat() / sizes[i].width.toFloat())
+                if (nextRatio >= (minSize?.height?.toFloat()?.div(minSize.width.toFloat())!!)) {
+                    bestSizes = Size(sizes[i].width,sizes[i].height)
+                }
+            }
+        }
+        return bestSizes
     }
 
     /**
@@ -126,8 +177,6 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
      * Open camera
      */
     private fun startCameraPreview(surfaceHolder: SurfaceHolder) {
-        cameraManager = getSystemService(Context.CAMERA_SERVICE) as CameraManager
-        cameraId = cameraManager.cameraIdList[0]
         if (ActivityCompat.checkSelfPermission(
                 this,
                 Manifest.permission.CAMERA
@@ -158,7 +207,7 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
         val displayMetrics = Resources.getSystem().displayMetrics
         width = displayMetrics.widthPixels
         height = displayMetrics.heightPixels
-        imageReader = ImageReader.newInstance(width, height, ImageFormat.JPEG, 2)
+        imageReader = ImageReader.newInstance(width, height, ImageFormat.YUV_420_888, 2)
         imageReader.setOnImageAvailableListener({ reader ->
             val image = reader.acquireLatestImage()
             image?.let {
